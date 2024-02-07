@@ -42,3 +42,43 @@ class Graph:
 
         """
         self.mst = None
+        if len(self.adj_mat) == 0:
+            raise ValueError("Cannot find minimum spanning tree for an empty graph")
+        # For use with a priority queue/heap, change non-edges (edges of weight zero) to weight inf
+        adj_mat = np.where(self.adj_mat==0, np.inf, self.adj_mat)
+        
+        # Use Prim's algorithm to construct a MST from self.adj_mat
+        self.mst = np.zeros(adj_mat.shape)
+        # Start with any node
+        s = 0
+        # Create an empty priority queue/heap
+        pq = []
+        # To avoid using _siftup/_siftdown, instead mark the "valid" elements of the heap:
+        # {node: [cost of shortest path from S to node, (u in S, node)]}
+        # The keys of the dictionary also serve as the unexplored set of nodes V
+        pq_valid = {i:[adj_mat[s, i], (s, i)] 
+                    for i in range(1, len(adj_mat))}
+        # Insert unexplored nodes V, prioritized by the cost of the
+        # cheapest known edge between v and S = {s}.
+        for v, cost_v in pq_valid.items():
+            heapq.heappush(pq, cost_v)
+        # Continue drawing from heap until all nodes have been added to the MST (pq_valid is empty)
+        while len(pq_valid) > 0:
+            cost, (i, u) = heapq.heappop(pq)   # Remove cheapest unexplored node u
+            # If a disconnected node is being explored, raise a ValueError
+            if cost == np.inf:
+                raise ValueError("Cannot find minimum spanning tree for disconnected graph")
+            # If the node popped from the heap is invalid, try again
+            if u not in pq_valid.keys():
+                continue
+            self.mst[i, u] = adj_mat[i, u]     # Add node u to the MST via the cheapest edge(S, u)
+            self.mst[u, i] = adj_mat[u, i]
+            pq_valid.pop(u)   # Removing node from set V is equivalent to adding node to set S
+            # Decrease-key for nodes V, if the cost of the cheapest known
+            # path between S and v has changed with the addition of u to S,
+            # i.e., if edge(u, v) < cost(prev_S, v)
+            for v, cost_v in pq_valid.items():
+                if adj_mat[u, v] < cost_v[0]:
+                    # Update cost(S, v) to edge(u, v) and (node in prev_S, v) to (u, v)
+                    pq_valid[v] = [adj_mat[u, v], (u, v)]
+                    heapq.heappush(pq, pq_valid[v])
